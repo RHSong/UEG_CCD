@@ -5,3 +5,4 @@ back/
 *.p
 *pynb
 tmp
+plot/
