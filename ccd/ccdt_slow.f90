@@ -97,25 +97,20 @@
     Real (kind=pr),     Intent(in)  :: moe(nao), eri(nao,nao)
     Real (kind=pr),     Intent(in)  :: t2(nocc+1:nao,nocc,nocc)
     Real (kind=pr),     Intent(out) :: ene
-    Integer                         :: a, b, c, i, j, k
-    Real (kind=pr)                  :: denom
-    Real (kind=pr)                  :: W1, W2, W3, W4, W5, W6
-    Real (kind=pr)                  :: Wsq_sum, Seven, Sodd
-    Real (kind=pr)                  :: Etot
+    Integer                         :: a,b,c,i,j,k
+    Real (kind=pr)                  :: Waibjck, W, denom, fac
+    Real (kind=pr)                  :: symm
 
     Call init_g_map(rgvecs, nao)
     ene = Zero
 
-    !$omp parallel default(shared) &
-    !$omp private(b, c, i, j, k, denom, &
-    !$omp         W1, W2, W3, W4, W5, W6, &
-    !$omp         Seven, Sodd, Wsq_sum, Etot)
-    !$omp do schedule(dynamic) reduction(+:ene)
+    !$omp parallel default(shared)
+    !$omp do schedule(dynamic) private(Waibjck, W, denom, c, fac, symm) reduction(+:ene)
     Do a = nocc+1, nao
-    Do b = nocc+1, a
-        Do i = 1, nocc
-        Do j = 1, i 
-        Do k = 1, j 
+    Do b = nocc+1, a       
+        Do i = 1, nocc     
+        Do j = 1, nocc     
+        Do k = 1, nocc     
             Call qconserv_c(rgvecs, i, j, k, a, b, c, nao)
             If (c <= nocc) cycle
             If (c > b) cycle
@@ -127,24 +122,24 @@
                 denom = denom * 2.0_pr
             End If
 
-            If (i == k) then
-                denom = denom * 6.0_pr
-            Else If (i == j .or. j == k) then
-                denom = denom * 2.0_pr
-            End If
+            Call buildW(qconserv, eri, t2, W, a, b, c, i, j, k, nocc, nao)
+            Waibjck = W / denom
+            ene = ene + 4.0_pr * Waibjck * W
 
-            Call buildW(qconserv, eri, t2, W1, a, b, c, i, j, k, nocc, nao)
-            Call buildW(qconserv, eri, t2, W2, a, b, c, j, k, i, nocc, nao)
-            Call buildW(qconserv, eri, t2, W3, a, b, c, k, i, j, nocc, nao)
-            Call buildW(qconserv, eri, t2, W4, a, b, c, j, i, k, nocc, nao)
-            Call buildW(qconserv, eri, t2, W5, a, b, c, i, k, j, nocc, nao)
-            Call buildW(qconserv, eri, t2, W6, a, b, c, k, j, i, nocc, nao)
+            Call buildW(qconserv, eri, t2, W, a, b, c, j, k, i, nocc, nao)
+            ene = ene + Waibjck * W
 
-            Seven = W1 + W2 + W3
-            Sodd  = W4 + W5 + W6
-            Wsq_sum = W1*W1 + W2*W2 + W3*W3 + W4*W4 + W5*W5 + W6*W6
+            Call buildW(qconserv, eri, t2, W, a, b, c, k, i, j, nocc, nao)
+            ene = ene + Waibjck * W
 
-            ene = ene + (3.0_pr * Wsq_sum + Seven*Seven + Sodd*Sodd - 4.0_pr * Seven * Sodd) / denom
+            Call buildW(qconserv, eri, t2, W, a, b, c, j, i, k, nocc, nao)
+            ene = ene - 2.0_pr * Waibjck * W
+
+            Call buildW(qconserv, eri, t2, W, a, b, c, i, k, j, nocc, nao)
+            ene = ene - 2.0_pr * Waibjck * W
+
+            Call buildW(qconserv, eri, t2, W, a, b, c, k, j, i, nocc, nao)
+            ene = ene - 2.0_pr * Waibjck * W
         End Do
         End Do
         End Do
@@ -154,6 +149,7 @@
     !$omp end parallel
 
     ene = ene * 2.0_pr
+
     End Subroutine
 
     End Module
