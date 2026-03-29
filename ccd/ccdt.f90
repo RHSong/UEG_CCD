@@ -44,37 +44,6 @@
     end if
     End Subroutine
 
-    !Subroutine build_imd(qconserv, eri, t2, imd, a, i, b, j, c, k, nocc, nao)
-    !Implicit None
-    !Integer,            Intent(in)  :: nocc, nao
-    !Integer,            Intent(in)  :: a, b, c, i, j, k
-    !Integer,            Intent(in)  :: qconserv(nao,nao,nao)
-    !Real (kind=pr),     Intent(in)  :: eri(nao,nao)
-    !Real (kind=pr),     Intent(in)  :: t2(nocc+1:nao,nocc,nocc)
-    !Real (kind=pr),     Intent(out) :: imd
-    !Integer                         :: f, m, tmp
-
-    !imd = Zero
-
-    !! --- Term 1: \sum_f t2(a,i,j) * (bc|fk) ---
-    !! T2 implied virtual f = k_i + k_j - k_a
-    !f = qconserv(i,a,j) + 1
-    !! ERI required virtual f = k_b - k_c + k_k
-    !tmp = qconserv(b,c,k) + 1
-    !If (f > nocc .and. f <= nao .and. f == tmp) then
-    !    imd = imd + t2(a,i,j) * eri(b,c)
-    !End If
-
-    !! --- Term 2: \sum_m t2(a,i,m) * (mc|jk) ---
-    !! T2 implied occupied m = k_a + k_b - k_i
-    !m = qconserv(a,i,b) + 1
-    !! ERI required occupied m = k_c + k_j - k_k
-    !tmp = qconserv(c,k,j) + 1
-    !If (m <= nocc .and. m > 0 .and. m == tmp) then
-    !    imd = imd - t2(a,i,m) * eri(j,k)
-    !End If
-    !End Subroutine
-
     Subroutine build_imd(qconserv, eri, t2, imd, a, i, b, j, c, k, nocc, nao)
     Implicit None
     Integer,            Intent(in)  :: nocc, nao
@@ -83,17 +52,15 @@
     Real (kind=pr),     Intent(in)  :: eri(nao,nao)
     Real (kind=pr),     Intent(in)  :: t2(nocc+1:nao,nocc,nocc)
     Real (kind=pr),     Intent(out) :: imd
-    Integer                         :: f, m, tmp
+    Integer                         :: f, m
     imd = Zero
     f = qconserv(a,i,b) + 1
-    tmp = qconserv(k,c,j) + 1
-    If (f > nocc .and. f == tmp) then
+    If (f > nocc) then
         imd = imd + t2(c,k,j) * eri(a,i)
     End If
 
-    m = qconserv(a,i,j) + 1
-    tmp = qconserv(b,k,c) + 1
-    If (m <= nocc .and. m > 0 .and. m == tmp) then
+    m = qconserv(i,a,j) + 1
+    If (m <= nocc .and. m > 0) then
         imd = imd - t2(b,m,k) * eri(a,i)
     End If
     End Subroutine
@@ -131,19 +98,18 @@
     Real (kind=pr),     Intent(in)  :: t2(nocc+1:nao,nocc,nocc)
     Real (kind=pr),     Intent(out) :: ene
     Integer                         :: a,b,c,d,i,j,k,l
-    Real (kind=pr)                  :: Waibjck, W, denom
-    !Call init_g_map(rgvecs, nao)
+    Real (kind=pr)                  :: Waibjck, W, denom, fac
+    Call init_g_map(rgvecs, nao)
     ene = Zero
     !$omp parallel default(shared)
-    !$omp do schedule(static) private(Waibjck, W, denom) reduction(+:ene)
+    !$omp do schedule(static) private(Waibjck, W, denom, c) reduction(+:ene)
     Do a = nocc+1, nao
     Do b = nocc+1, nao
-    Do c = nocc+1, nao
         Do i = 1, nocc
         Do j = 1, nocc
         Do k = 1, nocc
-            !Call qconserv_c(rgvecs, i, j, k, a, b, c, nao)
-            !If (c <= nocc) cycle
+            Call qconserv_c(rgvecs, i, j, k, a, b, c, nao)
+            If (c <= nocc) cycle
             denom = moe(i) + moe(j) + moe(k) - moe(a) - moe(b) - moe(c)
             Call buildW(qconserv, eri, t2, W, a, b, c, i, j, k, nocc, nao)
             Waibjck = W / denom
@@ -161,7 +127,6 @@
         End Do
         End Do
         End Do
-    End Do
     End Do
     End Do
     !$omp end do
