@@ -18,7 +18,6 @@ def strucfac(ueg, t2):
     Sqd = Sqd.reshape((nvir*nocc, 1))
     Sqx = Sqx.reshape((nvir*nocc, 1))
     uni_Lq, idx = np.unique(Lq.round(decimals=6), axis=0, return_inverse=True)
-    count = np.bincount(idx)
     Sqd_sum = np.bincount(idx, weights=Sqd[:,0])
     Sqx_sum = np.bincount(idx, weights=Sqx[:,0])
     return uni_Lq, (Sqd_sum + Sqx_sum), Sqd_sum, Sqx_sum

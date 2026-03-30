@@ -52,7 +52,7 @@ q, avgSq = SphereAvg(q, sq)
 print("===dRPA Sq===")
 print((np.array([q, avgSq / nelec]).T)[:20])
 
-# ccd(t)
+# ccd
 t_start = time.perf_counter()
 E_corr, Ed, Ex, t2 = ccd_solver(my_ueg.qconserv, my_ueg.eri, denom, my_ueg.nocc, my_ueg.nbas, level_shift=ls)
 print("E(CCD) =", E_corr / nelec, Ed / nelec, Ex / nelec)
@@ -64,11 +64,51 @@ q, avgSq = SphereAvg(q, sq)
 print("===CCD Sq===")
 print((np.array([q, avgSq / nelec]).T)[:20])
 
+# (T)
 t_start = time.perf_counter()
 et = ueg_ccd_t.t_ene(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
 print("E(CCD(T)) =", et)
 t_end = time.perf_counter()
 print(f"(T) time: {t_end-t_start} sec")
+
+Sq = ueg_ccd_t.t_structfac(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
+nvir, nocc = t2.shape[:2]
+Lq = np.zeros([nvir, nocc, 3])
+for a in range(nvir):
+    for i in range(nocc):
+        Lq[a,i] = my_ueg.rgvecs[nocc+a] - my_ueg.rgvecs[i]
+Lq = Lq.reshape((-1,3))
+Sq = Sq.reshape((-1,1)) / 3
+q, idx = np.unique(Lq.round(decimals=6), axis=0, return_inverse=True)
+sq = np.bincount(idx, weights=Sq[:,0])
+q, avgSq = SphereAvg(q, sq)
+print("===CCD(T) Sq===")
+print((np.array([q, avgSq / nelec]).T)[:20])
+
+# (bT)
+t_start = time.perf_counter()
+Foo, Fvv = ueg_ccd.ccfock(my_ueg.qconserv, my_ueg.eri, t2, my_ueg.nocc, my_ueg.nbas)
+assert np.all(Foo < 0), "Foo raise moe_occ"
+assert np.all(Fvv > 0), "Fvv lower moe_vir"
+moe = moe + np.concatenate((Foo, Fvv))
+et = ueg_ccd_t.t_ene(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
+print("E(CCD(bT)) =", et)
+t_end = time.perf_counter()
+print(f"(bT) time: {t_end-t_start} sec")
+
+Sq = ueg_ccd_t.t_structfac(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
+nvir, nocc = t2.shape[:2]
+Lq = np.zeros([nvir, nocc, 3])
+for a in range(nvir):
+    for i in range(nocc):
+        Lq[a,i] = my_ueg.rgvecs[nocc+a] - my_ueg.rgvecs[i]
+Lq = Lq.reshape((-1,3))
+Sq = Sq.reshape((-1,1)) / 3
+q, idx = np.unique(Lq.round(decimals=6), axis=0, return_inverse=True)
+sq = np.bincount(idx, weights=Sq[:,0])
+q, avgSq = SphereAvg(q, sq)
+print("===CCD(bT) Sq===")
+print((np.array([q, avgSq / nelec]).T)[:20])
 
 ## bmp2
 #t_start = time.perf_counter()
