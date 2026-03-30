@@ -49,7 +49,6 @@
             b = qconserv(i,a,j) + 1
             ibja = eri(i,b)
             If (b <= nocc) cycle
-            
             ed = ed + 2.0_pr * iajb * t2(a,i,j)
             ex = ex - ibja * t2(a,i,j)
         End Do
@@ -191,31 +190,10 @@
     Integer                         :: a,b,c,d,i,j,k,l
     Real (kind=pr)                  :: bjkc, bckj, aikc, acki
     Real (kind=pr)                  :: kcld, kdlc
-    Real (kind=pr)                  :: imd(nocc+1:nao,nocc,nocc)
     r2 = Zero
-    imd = Zero
-
     !$omp parallel default(shared)
-    !$omp do schedule(static) private(kcld, kdlc, c, d)
-    Do a = nocc+1, nao
-    Do i = 1, nocc
-    Do k = 1, nocc
-        c = qconserv(i,a,k) + 1
-        If (c <= nocc) cycle
-        Do l = 1, nocc
-            d = qconserv(k,c,l) + 1
-            If (d <= nocc) cycle
-            kcld = eri(k,c)
-            kdlc = eri(k,d)
-            imd(a,i,l) = imd(a,i,l) + (2.0_pr * kcld - kdlc) * (2.0_pr * t2(a,i,k) - t2(a,k,i))
-        End Do
-    End Do
-    End Do
-    End Do
-    !$omp end do
-
     !$omp do schedule(static) private(bjkc, bckj, aikc, acki), &
-    !$omp& private(b, c, d)
+    !$omp& private(kcld, kdlc, b, c, d)
     Do a = nocc+1, nao
     Do i = 1, nocc
     Do j = 1, nocc
@@ -235,9 +213,20 @@
             If (c <= nocc) cycle
             aikc = eri(a,i)
             acki = eri(a,c)
-            r2(a,i,j) = r2(a,i,j) + (2.0_pr * aikc - acki + imd(a,i,k)) * (2.0_pr * t2(b,j,k) - t2(b,k,j))
+            r2(a,i,j) = r2(a,i,j) + (2.0_pr * aikc - acki) * (2.0_pr * t2(b,j,k) - t2(b,k,j))
         End Do
 
+        Do k = 1, nocc
+            c = qconserv(i,a,k) + 1
+            If (c <= nocc) cycle
+            Do l = 1, nocc
+                d = qconserv(j,b,l) + 1
+                If (d <= nocc) cycle
+                kcld = eri(k,c)
+                kdlc = eri(k,d)
+                r2(a,i,j) = r2(a,i,j) + (2.0_pr * kcld - kdlc) * (2.0_pr * t2(a,i,k) - t2(a,k,i)) * (2.0_pr * t2(b,j,l) - t2(b,l,j))
+            End Do
+        End Do
     End Do
     End Do
     End Do
@@ -257,30 +246,10 @@
     Real (kind=pr)                  :: acbd, adbc
     Real (kind=pr)                  :: kilj, kjli
     Real (kind=pr)                  :: kcld, kdlc
-    Real (kind=pr)                  :: imd(nocc,nocc,nocc)
     r2 = Zero
-    imd = Zero
     !$omp parallel default(shared)
-    !$omp do schedule(static) private(kcld, kdlc, d, l)
-    Do i = 1, nocc
-    Do j = 1, nocc
-    Do c = nocc+1, nao
-        d = qconserv(i,c,j) + 1
-        If (d <= nocc) cycle
-        Do k = 1, nocc
-            l = qconserv(c,k,d) + 1
-            If (l > nocc .or. l == 0) cycle
-            kcld = eri(k,c)
-            kdlc = eri(k,d)
-            imd(k,i,j) = imd(k,i,j) + (2.0_pr * kcld - kdlc) * t2(c,i,j)
-        End Do
-    End Do
-    End Do
-    End Do
-    !$omp end do
-
     !$omp do schedule(static) private(acbd, adbc, kilj, kjli), &
-    !$omp& private(b, d, l)
+    !$omp& private(kcld, kdlc, b, d, l)
     Do a = nocc+1, nao
     Do i = 1, nocc
     Do j = 1, nocc
@@ -300,9 +269,20 @@
             If (l > nocc .or. l == 0)  cycle
             kilj = eri(k,i)
             kjli = eri(k,j)
-            r2(a,i,j) = r2(a,i,j) + (2.0_pr * kilj - kjli + imd(k,i,j)) * t2(a,k,l)
+            r2(a,i,j) = r2(a,i,j) + (2.0_pr * kilj - kjli) * t2(a,k,l)
         End Do
 
+        Do k = 1, nocc
+            l = qconserv(a,k,b) + 1
+            If (l > nocc .or. l == 0) cycle
+            Do c = nocc+1, nao
+                d = qconserv(k,c,l) + 1
+                If (d <= nocc) cycle
+                kcld = eri(k,c)
+                kdlc = eri(k,d)
+                r2(a,i,j) = r2(a,i,j) + (2.0_pr * kcld - kdlc) * t2(a,k,l) * t2(c,i,j)
+            End Do
+        End Do
     End Do
     End Do
     End Do
@@ -321,35 +301,10 @@
     Integer                         :: a,b,c,d,i,j,k,l
     Real (kind=pr)                  :: bikc, bcki, ajkc, ackj
     Real (kind=pr)                  :: kcld, kdlc
-    Real (kind=pr)                  :: imd1(nocc+1:nao,nocc,nocc)
-    Real (kind=pr)                  :: imd2(nocc+1:nao,nocc,nocc)
     r2 = Zero
-    imd1 = Zero
-    imd2 = Zero
     !$omp parallel default(shared)
-    !$omp do schedule(static) private(kcld, kdlc, c, d)
-    Do b = nocc+1, nao
-    Do i = 1, nocc
-    Do l = 1, nocc
-        d = qconserv(i,b,l) + 1
-        If (d <= nocc) cycle
-        Do k = 1, nocc
-            c = qconserv(k,d,l) + 1
-            If (c <= nocc) cycle
-            kcld = eri(k,c)
-            kdlc = eri(k,d)
-            imd1(b,i,k) = imd1(b,i,k) + (2.0_pr * kcld - kdlc) * t2(b,l,i)
-            imd1(b,i,k) = imd1(b,i,k) - 2.0_pr * (2.0_pr * kcld - kdlc) * t2(b,i,l)
-            imd2(b,k,i) = imd2(b,k,i) + (2.0_pr * kdlc - kcld) * t2(b,l,i)
-            imd2(b,k,i) = imd2(b,k,i) + (2.0_pr * kcld - kdlc) * t2(b,i,l)
-        End Do
-    End Do
-    End Do
-    End Do
-    !$omp end do
-
     !$omp do schedule(static) private(bikc, bcki, ajkc, ackj), &
-    !$omp& private(b, c, d)
+    !$omp& private(kcld, kdlc, b, c, d)
     Do a = nocc+1, nao
     Do i = 1, nocc
     Do j = 1, nocc
@@ -361,8 +316,8 @@
             If (c <= nocc) cycle
             bikc = eri(b,i)
             bcki = eri(b,c)
-            r2(a,i,j) = r2(a,i,j) - (2.0_pr * bikc - bcki - imd1(b,i,k)) * t2(a,j,k)
-            r2(a,i,j) = r2(a,i,j) - (2.0_pr * bcki - bikc - imd2(b,k,i)) * t2(a,k,j)
+            r2(a,i,j) = r2(a,i,j) - (2.0_pr * bikc - bcki) * t2(a,j,k)
+            r2(a,i,j) = r2(a,i,j) - (2.0_pr * bcki - bikc) * t2(a,k,j)
         End Do
 
         Do k = 1, nocc
@@ -374,6 +329,19 @@
             r2(a,i,j) = r2(a,i,j) - (2.0_pr * ackj - ajkc) * t2(b,k,i)
         End Do
 
+        Do k = 1, nocc
+            c = qconserv(j,a,k) + 1
+            If (c <= nocc) cycle
+            Do l = 1, nocc
+                d = qconserv(i,b,l) + 1
+                If (d <= nocc) cycle
+                kcld = eri(k,c)
+                kdlc = eri(k,d)
+                r2(a,i,j) = r2(a,i,j) + (2.0_pr * kcld - kdlc) * (t2(a,j,k) * t2(b,l,i) + t2(a,k,j) * t2(b,i,l))
+                r2(a,i,j) = r2(a,i,j) + (2.0_pr * kdlc - kcld) * t2(a,k,j) * t2(b,l,i)
+                r2(a,i,j) = r2(a,i,j) - 2.0_pr * (2.0_pr * kcld - kdlc) * t2(a,j,k) * t2(b,i,l)
+            End Do
+        End Do
     End Do
     End Do
     End Do
@@ -391,9 +359,7 @@
     Real (kind=pr),     Intent(out) :: r2(nocc+1:nao,nocc,nocc)
     Integer                         :: a,b,c,d,i,j,k,l
     Real (kind=pr)                  :: aibj, bjkc, aikc, kcld
-    Real (kind=pr)                  :: imd(nocc+1:nao,nocc,nocc)
     r2 = Zero
-    imd = Zero
     !$omp parallel default(shared)
     !$omp do schedule(static) private(aibj, b)
     Do a = nocc+1, nao
@@ -409,24 +375,7 @@
     End Do
     !$omp end do
 
-    !$omp do schedule(static) private(kcld, c, d)
-    Do a = nocc+1, nao
-    Do i = 1, nocc
-    Do k = 1, nocc
-        c = qconserv(i,a,k) + 1
-        If (c <= nocc) cycle
-        Do l = 1, nocc
-            d = qconserv(k,c,l) + 1
-            If (d <= nocc) cycle
-            kcld = eri(k,c)
-            imd(a,i,l) = imd(a,i,l) + 2.0_pr * kcld * t2(a,i,k)
-        End Do
-    End Do
-    End Do
-    End Do
-    !$omp end do
-
-    !$omp do schedule(static) private(bjkc, aikc, b, c, d)
+    !$omp do schedule(static) private(bjkc, aikc, kcld, b, c, d)
     Do a = nocc+1, nao
     Do i = 1, nocc
     Do j = 1, nocc
@@ -444,7 +393,18 @@
             c = qconserv(a,i,k) + 1
             If (c <= nocc) cycle
             aikc = eri(a,i)
-            r2(a,i,j) = r2(a,i,j) + 2.0_pr * (aikc + imd(a,i,k)) * t2(b,j,k)
+            r2(a,i,j) = r2(a,i,j) + 2.0_pr * aikc * t2(b,j,k)
+        End Do
+
+        Do k = 1, nocc
+            c = qconserv(i,a,k) + 1
+            If (c <= nocc) cycle
+            Do l = 1, nocc
+                d = qconserv(j,b,l) + 1
+                If (d <= nocc) cycle
+                kcld = eri(k,c)
+                r2(a,i,j) = r2(a,i,j) + 4.0_pr * kcld * t2(a,i,k) * t2(b,j,l)
+            End Do
         End Do
     End Do
     End Do
@@ -454,4 +414,3 @@
     End Subroutine
 
     End Module
-

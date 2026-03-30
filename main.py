@@ -8,7 +8,7 @@ from ueg_ccd import ueg_ccd, ueg_ccd_t
 
 nelec = 14
 nbas = 19
-rs = 2.0
+rs = 1.0
 
 # hf
 my_ueg = UEG(nelec, nbas, rs, verbose=True)

@@ -7,7 +7,6 @@ def strucfac(ueg, t2):
     ene = 0
     for a in range(nvir):
         for i in range(nocc):
-            #Lq[a,i] = np.linalg.norm(ueg.rgvecs[nocc+a] - ueg.rgvecs[i])
             Lq[a,i] = ueg.rgvecs[nocc+a] - ueg.rgvecs[i]
             for j in range(nocc):
                 b = ueg.qconserv[i,nocc+a,j]
@@ -22,9 +21,6 @@ def strucfac(ueg, t2):
     count = np.bincount(idx)
     Sqd_sum = np.bincount(idx, weights=Sqd[:,0])
     Sqx_sum = np.bincount(idx, weights=Sqx[:,0])
-    #uni_Lq *= ueg.qmin()
-    #print("test:", ene / ueg.nocc / 2)
-    #print("test:", np.sum((Sqd_sum + Sqx_sum) / uni_Lq**2) * 4 * np.pi / ueg._volume / ueg.nocc / 2)
     return uni_Lq, (Sqd_sum + Sqx_sum), Sqd_sum, Sqx_sum
 
 def SphereAvg(Lq, Sq):
