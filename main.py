@@ -6,15 +6,16 @@ from ccd import *
 from strucfac import *
 from ueg_ccd import ueg_ccd, ueg_ccd_t
 
-nelec = 14
+nelec = 7 * 2
 nbas = 19
-rs = 1.0
+rs = 2.0
 
 # hf
 my_ueg = UEG(nelec, nbas, rs, verbose=True)
 my_ueg.bdrp = True
 ehf, ex, moe, idx = hf_energy(my_ueg)
 print("E(HF) =", ehf, ex)
+print("HOMO-LUMO gap =", moe[my_ueg.nocc] - moe[my_ueg.nocc-1])
 
 P = np.zeros((my_ueg.nbas, my_ueg.nbas), dtype=int)
 P[np.arange(my_ueg.nbas), idx] = 1
@@ -33,7 +34,7 @@ E_corr, Ed, Ex, t2 = ccd_solver(my_ueg.qconserv, my_ueg.eri, denom, my_ueg.nocc,
                                 DoMosaic=False, DoRing=False, DoLadder=False, DoxRing=False,)
 print("E(MP2) =", E_corr / nelec, Ed / nelec, Ex / nelec)
 t_end = time.perf_counter()
-print(f"mp2 time: {t_end-t_start} sec")
+print(f"mp2 time: {t_end-t_start} sec", flush=True)
 
 q, sq, sqd, sqx = strucfac(my_ueg, t2)
 q, avgSq = SphereAvg(q, sq)
@@ -45,7 +46,7 @@ t_start = time.perf_counter()
 E_corr, Ed, Ex, t2 = drccd_solver(my_ueg.qconserv, my_ueg.eri, denom, my_ueg.nocc, my_ueg.nbas, level_shift=ls)
 print("E(drpa) =", E_corr / nelec, Ed / nelec, Ex / nelec)
 t_end = time.perf_counter()
-print(f"drpa time: {t_end-t_start} sec")
+print(f"drpa time: {t_end-t_start} sec", flush=True)
 
 q, sq, sqd, sqx = strucfac(my_ueg, t2)
 q, avgSq = SphereAvg(q, sq)
@@ -57,7 +58,7 @@ t_start = time.perf_counter()
 E_corr, Ed, Ex, t2 = ccd_solver(my_ueg.qconserv, my_ueg.eri, denom, my_ueg.nocc, my_ueg.nbas, level_shift=ls)
 print("E(CCD) =", E_corr / nelec, Ed / nelec, Ex / nelec)
 t_end = time.perf_counter()
-print(f"ccd time: {t_end-t_start} sec")
+print(f"ccd time: {t_end-t_start} sec", flush=True)
 
 q, sq, sqd, sqx = strucfac(my_ueg, t2)
 q, avgSq = SphereAvg(q, sq)
@@ -67,9 +68,9 @@ print((np.array([q, avgSq / nelec]).T)[:20])
 # (T)
 t_start = time.perf_counter()
 et = ueg_ccd_t.t_ene(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
-print("E(CCD(T)) =", et)
+print("E(CCD(T)) =", et / nelec)
 t_end = time.perf_counter()
-print(f"(T) time: {t_end-t_start} sec")
+print(f"(T) time: {t_end-t_start} sec", flush=True)
 
 Sq = ueg_ccd_t.t_structfac(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
 nvir, nocc = t2.shape[:2]
@@ -91,10 +92,11 @@ Foo, Fvv = ueg_ccd.ccfock(my_ueg.qconserv, my_ueg.eri, t2, my_ueg.nocc, my_ueg.n
 assert np.all(Foo < 0), "Foo raise moe_occ"
 assert np.all(Fvv > 0), "Fvv lower moe_vir"
 moe = moe + np.concatenate((Foo, Fvv))
+print("Renormalized gap =", np.min(moe[my_ueg.nocc:]) - np.max(moe[:my_ueg.nocc]))
 et = ueg_ccd_t.t_ene(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
-print("E(CCD(bT)) =", et)
+print("E(CCD(bT)) =", et / nelec)
 t_end = time.perf_counter()
-print(f"(bT) time: {t_end-t_start} sec")
+print(f"(bT) time: {t_end-t_start} sec", flush=True)
 
 Sq = ueg_ccd_t.t_structfac(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
 nvir, nocc = t2.shape[:2]

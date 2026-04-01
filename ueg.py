@@ -133,23 +133,33 @@ class UEG(object):
                 else:
                     self.eri[p,q] = 4*np.pi / (self._volume*gvec)
         t2 = time.perf_counter()
-        print(f"eri time: {t2-t1} sec, mem usage: {lib.current_memory()[0]/1e3} GB")
+        print(f"eri time: {t2-t1} sec, mem usage: {lib.current_memory()[0]/1e3} GB", flush=True)
 
     def build_qconserv(self):
         t1 = time.perf_counter()
         from scipy.spatial import cKDTree
-        G_i = self.rgvecs[:, None, None, :]
+        self.qconserv = np.empty((self.nbas, self.nbas, self.nbas), dtype=np.int32)
+        tree = cKDTree(self.rgvecs)
         G_a = self.rgvecs[None, :, None, :]
         G_j = self.rgvecs[None, None, :, :]
-        G_b_all = G_i + G_j - G_a
-        G_b_flat = G_b_all.reshape(-1, 3)
 
-        tree = cKDTree(self.rgvecs)
-        distances, indices = tree.query(G_b_flat, distance_upper_bound=1e-5)
-        indices[indices == self.nbas] = -1
-        self.qconserv = indices.reshape(self.nbas, self.nbas, self.nbas)
+        bytes_per_slice = 64 * (self.nbas ** 2)
+        max_bytes = 4 * 1024**3  # 4 GB limit
+        blk_size = max(1, int(max_bytes / bytes_per_slice))
+
+        for i0, i1 in lib.prange(0, self.nbas, blk_size):
+            G_i_chunk = self.rgvecs[i0:i1, None, None, :]
+
+            G_b_chunk = G_i_chunk + G_j - G_a
+            G_b_flat = G_b_chunk.reshape(-1, 3)
+
+            _, indices = tree.query(G_b_flat, distance_upper_bound=1e-5)
+
+            indices[indices == self.nbas] = -1
+
+            self.qconserv[i0:i1, :, :] = indices.reshape(i1 - i0, self.nbas, self.nbas)
         t2 = time.perf_counter()
-        print(f"qconserv time: {t2-t1} sec, mem usage: {lib.current_memory()[0]/1e3} GB")
+        print(f"qconserv time: {t2-t1} sec, mem usage: {lib.current_memory()[0]/1e3} GB", flush=True)
 
     def print_info(self):
         print("Uniform Electron Gas Parameters")
