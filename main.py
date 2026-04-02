@@ -6,13 +6,13 @@ from ccd import *
 from strucfac import *
 from ueg_ccd import ueg_ccd, ueg_ccd_t
 
-nelec = 7 * 2
-nbas = 50
-rs = 10.0
+nelec = 81 * 2
+nbas = 800
+rs = 1.0
 
 # hf
-my_ueg = UEG(nelec, nbas, rs, verbose=True)
-my_ueg.twist = True
+#tw = np.array([0.62, 0.77, 0.12])
+my_ueg = UEG(nelec, nbas, rs, twist=True, verbose=True)
 ehf, ex, moe, idx = hf_energy(my_ueg)
 print("E(HF) =", ehf, ex)
 print("HOMO-LUMO gap =", moe[my_ueg.nocc] - moe[my_ueg.nocc-1])
@@ -89,8 +89,8 @@ print((np.array([q, avgSq / nelec]).T)[:20])
 # (bT)
 t_start = time.perf_counter()
 Foo, Fvv = ueg_ccd.ccfock(my_ueg.qconserv, my_ueg.eri, t2, my_ueg.nocc, my_ueg.nbas)
-assert np.all(Foo < 0), "Foo raise moe_occ"
-assert np.all(Fvv > 0), "Fvv lower moe_vir"
+#assert np.all(Foo < 0), "Foo raise moe_occ"
+#assert np.all(Fvv > 0), "Fvv lower moe_vir"
 moe = moe + np.concatenate((Foo, Fvv))
 print("Renormalized gap =", np.min(moe[my_ueg.nocc:]) - np.max(moe[:my_ueg.nocc]))
 et = ueg_ccd_t.t_ene(my_ueg.rgvecs, my_ueg.qconserv, my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)

@@ -20,7 +20,7 @@ def sorter_function(inarr):
     return val
 
 class UEG(object):
-    def __init__(self, nelec, nbasis, rs, verbose=False):
+    def __init__(self, nelec, nbasis, rs, twist=False, verbose=False):
         self.nelec = nelec
         # Limited to closed shell 
         if ((self.nelec % 2) != 0):
@@ -40,7 +40,7 @@ class UEG(object):
 
         self.vcut = False
         # use Baldereschi point or custom shift
-        self.twist = False
+        self.twist = twist
 
         if isinstance(self.twist, np.ndarray):
             self.shift = self.twist

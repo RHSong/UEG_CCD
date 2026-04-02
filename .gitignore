@@ -8,3 +8,4 @@ tmp
 plot/
 *.log
 *.sh
+log*
