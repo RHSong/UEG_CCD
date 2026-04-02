@@ -7,12 +7,12 @@ from strucfac import *
 from ueg_ccd import ueg_ccd, ueg_ccd_t
 
 nelec = 7 * 2
-nbas = 19
-rs = 2.0
+nbas = 50
+rs = 10.0
 
 # hf
 my_ueg = UEG(nelec, nbas, rs, verbose=True)
-my_ueg.bdrp = True
+my_ueg.twist = True
 ehf, ex, moe, idx = hf_energy(my_ueg)
 print("E(HF) =", ehf, ex)
 print("HOMO-LUMO gap =", moe[my_ueg.nocc] - moe[my_ueg.nocc-1])

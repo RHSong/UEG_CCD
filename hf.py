@@ -11,8 +11,7 @@ def hf_energy(ueg):
         fock = np.zeros(ueg.nbas)
         for p in range(ueg.nbas):
             qvec[:] = ueg.rgvecs[p]
-            if ueg.bdrp:
-                qvec += np.array([0.25,0.25,0.25])
+            qvec += ueg.shift
             qvec *= ueg.qmin()
             fock[p] += 0.5 * np.dot(qvec, qvec)
             for i in (np.where(mo_occ == 1)[0]):
@@ -25,8 +24,7 @@ def hf_energy(ueg):
         mo_occ, mo_occ_old = mo_occ_old, mo_occ
     for i in moe_idx:
         qvec[:] = ueg.rgvecs[i]
-        if ueg.bdrp:
-            qvec += np.array([0.25,0.25,0.25])
+        qvec += ueg.shift
         qvec *= ueg.qmin()
         ehf += np.dot(qvec, qvec)
         for j in moe_idx:

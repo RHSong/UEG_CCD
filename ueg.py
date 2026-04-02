@@ -39,8 +39,16 @@ class UEG(object):
         self.madelung = 2.83729747948149 / self._length
 
         self.vcut = False
-        # use Baldereschi point
-        self.bdrp = False
+        # use Baldereschi point or custom shift
+        self.twist = False
+
+        if isinstance(self.twist, np.ndarray):
+            self.shift = self.twist
+        elif isinstance(self.twist, bool):
+            if self.twist:
+                self.shift = np.array([0.25,0.25,0.25])
+            else:
+                self.shift = np.array([0.0,0.0,0.0])
 
         self.create_gvecs()
         self.build_eri()
@@ -144,8 +152,8 @@ class UEG(object):
         G_j = self.rgvecs[None, None, :, :]
 
         bytes_per_slice = 64 * (self.nbas ** 2)
-        max_bytes = 4 * 1024**3  # 4 GB limit
-        blk_size = max(1, int(max_bytes / bytes_per_slice))
+        max_bytes = 16 * 1024**3  # 16 GB limit
+        blk_size = max(1, int(0.9 * max_bytes / bytes_per_slice))
 
         for i0, i1 in lib.prange(0, self.nbas, blk_size):
             G_i_chunk = self.rgvecs[i0:i1, None, None, :]
@@ -164,8 +172,9 @@ class UEG(object):
     def print_info(self):
         print("Uniform Electron Gas Parameters")
         print(" - Dimension of System       = %14d " % self.dim)
-        print(" - Number of Electrons       = %14d " % self.nelec)
         print(" - Madelung constant         = %14.8f " % self.madelung)
         print(" - Volume of Box             = %14.8f " % self._volume)
         print(" - Length of Box             = %14.8f " % self._length)
+        print(" - Number of Electrons       = %14d " % self.nelec)
         print(" - Number of Basis Functions = %14d " % self.nbas)
+        print(" - rs                        = %14d " % self.rs)

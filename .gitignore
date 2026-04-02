@@ -6,3 +6,5 @@ back/
 *pynb
 tmp
 plot/
+*.log
+*.sh
