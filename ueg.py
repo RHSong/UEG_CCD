@@ -52,7 +52,7 @@ class UEG(object):
 
         self.create_gvecs()
         self.build_eri()
-        self.build_qconserv()
+        #self.build_qconserv()
         if self.verbose:
             self.print_info()
 
@@ -178,3 +178,4 @@ class UEG(object):
         print(" - Number of Electrons       = %14d " % self.nelec)
         print(" - Number of Basis Functions = %14d " % self.nbas)
         print(" - rs                        = %14d " % self.rs)
+        print(" - shift                     =      ", self.shift)

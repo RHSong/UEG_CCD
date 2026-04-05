@@ -1,25 +1,17 @@
 import numpy as np
-def strucfac(ueg, t2):
+from ueg_ccd import ueg_ccd
+def strucfac(t2):
     nvir, nocc = t2.shape[:2]
-    Lq = np.zeros([nvir, nocc, 3])
-    Sqd = np.zeros([nvir, nocc])
-    Sqx = np.zeros([nvir, nocc])
-    ene = 0
-    for a in range(nvir):
-        for i in range(nocc):
-            Lq[a,i] = ueg.rgvecs[nocc+a] - ueg.rgvecs[i]
-            for j in range(nocc):
-                b = ueg.qconserv[i,nocc+a,j]
-                if b >= ueg.nocc:
-                    ene += 2 * t2[a,i,j] * 4 * np.pi / (ueg.qmin() * np.linalg.norm(Lq[a,i]))**2 / ueg._volume
-                    Sqd[a,i] += 2 * t2[a,i,j] 
-                    Sqx[a,i] -= t2[a,j,i]
+    nao = nvir + nocc
+    Sqd ,Sqx,Lq = ueg_ccd.strucfac_t2(t2,nocc,nao)
     Lq = Lq.reshape((nvir*nocc, 3))
     Sqd = Sqd.reshape((nvir*nocc, 1))
     Sqx = Sqx.reshape((nvir*nocc, 1))
     uni_Lq, idx = np.unique(Lq.round(decimals=6), axis=0, return_inverse=True)
     Sqd_sum = np.bincount(idx, weights=Sqd[:,0])
     Sqx_sum = np.bincount(idx, weights=Sqx[:,0])
+    L2 = np.linalg.norm(uni_Lq, axis=1)
+    L2 = L2 * L2
     return uni_Lq, (Sqd_sum + Sqx_sum), Sqd_sum, Sqx_sum
 
 def SphereAvg(Lq, Sq):
@@ -51,3 +43,9 @@ def fibonacci_sphere(samples=36):
         z = np.sin(theta) * radius
         points.append((x, y, z))
     return np.array(points)
+
+def checkene(ueg, Sq, Lq):
+    L2 = ueg.qmin() * np.linalg.norm(Lq, axis=1)
+    L2 = L2 * L2
+    ene = np.sum(Sq * 4 * np.pi / L2 / ueg._volume)
+    return ene

@@ -1,12 +1,12 @@
 import numpy as np
 from ueg_ccd import ueg_ccd
 
-def ccd_solver(qconserv, eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=50, level_shift=0.0, 
+def ccd_solver(eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=50, level_shift=0.0, 
                DoMosaic=True, DoRing=True, DoLadder=True, DoxRing=True):
     if t2 is None: t2 = np.zeros([nao-nocc, nocc, nocc])
-    r2 = ueg_ccd.ccd_res(qconserv, eri, denom, t2, nocc, DoMosaic, DoRing, DoLadder, DoxRing, nao)
+    r2 = ueg_ccd.ccd_res(eri, denom, t2, nocc, DoMosaic, DoRing, DoLadder, DoxRing, nao)
     r2 = 2 * r2 + r2.transpose(0,2,1)
-    Ed, Ex = ueg_ccd.ccd_ene(qconserv, eri, t2, nocc, nao)
+    Ed, Ex = ueg_ccd.ccd_ene(eri, t2, nocc, nao)
     E_corr = Ed + Ex
     norm_r2 = np.max(np.abs(r2))
     precond = 1/3 / (denom + level_shift)
@@ -22,9 +22,9 @@ def ccd_solver(qconserv, eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=50,
             mydiis.update_errvec(t2, r2)
             t2 = mydiis.DoDIIS().reshape(t2.shape)
 
-        r2 = ueg_ccd.ccd_res(qconserv, eri, denom, t2, nocc, DoMosaic, DoRing, DoLadder, DoxRing, nao)
+        r2 = ueg_ccd.ccd_res(eri, denom, t2, nocc, DoMosaic, DoRing, DoLadder, DoxRing, nao)
         r2 = 2 * r2 + r2.transpose(0,2,1)
-        Ed, Ex = ueg_ccd.ccd_ene(qconserv, eri, t2, nocc, nao)
+        Ed, Ex = ueg_ccd.ccd_ene(eri, t2, nocc, nao)
         E_corr = Ed + Ex
         norm_r2 = np.max(np.abs(r2))
         print(f"{niter:5d} {E_corr:12.8f} {norm_r2:12.8f}", flush=True)
@@ -32,10 +32,10 @@ def ccd_solver(qconserv, eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=50,
             break
     return E_corr, Ed, Ex, t2
 
-def drccd_solver(qconserv, eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=50, level_shift=0.0):
+def drccd_solver(eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=50, level_shift=0.0):
     if t2 is None: t2 = np.zeros([nao-nocc, nocc, nocc])
-    r2 = ueg_ccd.drccd_res(qconserv, eri, denom, t2, nocc, nao)
-    Ed, Ex = ueg_ccd.ccd_ene(qconserv, eri, t2, nocc, nao)
+    r2 = ueg_ccd.drccd_res(eri, denom, t2, nocc, nao)
+    Ed, Ex = ueg_ccd.ccd_ene(eri, t2, nocc, nao)
     E_corr = Ed + Ex
     norm_r2 = np.max(np.abs(r2))
     precond = 1 / (denom + level_shift)
@@ -51,8 +51,8 @@ def drccd_solver(qconserv, eri, denom, nocc, nao, t2=None, tol=1e-6, max_cycle=5
             mydiis.update_errvec(t2, r2)
             t2 = mydiis.DoDIIS().reshape(t2.shape)
 
-        r2 = ueg_ccd.drccd_res(qconserv, eri, denom, t2, nocc, nao)
-        Ed, Ex = ueg_ccd.ccd_ene(qconserv, eri, t2, nocc, nao)
+        r2 = ueg_ccd.drccd_res(eri, denom, t2, nocc, nao)
+        Ed, Ex = ueg_ccd.ccd_ene(eri, t2, nocc, nao)
         E_corr = Ed + Ex
         norm_r2 = np.max(np.abs(r2))
         print(f"{niter:5d} {E_corr:12.8f} {norm_r2:12.8f}", flush=True)

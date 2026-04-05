@@ -14,7 +14,7 @@
     Integer                         :: a,b,c,d,i,j,k,l
     denom = 1e8_pr
     !$omp parallel default(shared)
-    !$omp do schedule(static)
+    !$omp do schedule(static) private(b)
     Do a = nocc+1, nao
     Do i = 1, nocc
         Do j = 1, nocc
