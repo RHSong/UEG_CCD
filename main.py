@@ -6,13 +6,13 @@ from ccd import *
 from strucfac import *
 from ueg_ccd import qconserv, ueg_ccd, ueg_ccd_t
 
-nelec = 7 * 2
-nbas = 19
-rs = 3.0
+nelec = 57 * 2
+nbas = 300
+rs = 1.0
 
 # hf
 #tw = np.array([0.62, 0.77, 0.12])
-my_ueg = UEG(nelec, nbas, rs, twist=False, verbose=True)
+my_ueg = UEG(nelec, nbas, rs, twist=True, verbose=True)
 ehf, ex, moe, idx = hf_energy(my_ueg)
 print("E(HF) =", ehf, ex)
 print("HOMO-LUMO gap =", moe[my_ueg.nocc] - moe[my_ueg.nocc-1])
@@ -23,7 +23,6 @@ my_ueg.rgvecs = P @ my_ueg.rgvecs
 my_ueg.eri = None
 my_ueg.qconserv = None
 my_ueg.build_eri()
-#my_ueg.build_qconserv()
 
 qconserv.init_g_map(my_ueg.rgvecs, my_ueg.nbas)
 denom = ueg_ccd.build_denom(moe, my_ueg.nocc, my_ueg.nbas)
@@ -69,10 +68,11 @@ print((np.array([q, avgSq / nelec]).T)[:20])
 # (T)
 t_start = time.perf_counter()
 et = ueg_ccd_t.t_ene(my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
-print("E(CCD(T)) =", et / nelec)
+print("E(CCD(T)) =", et)
 t_end = time.perf_counter()
 print(f"(T) time: {t_end-t_start} sec", flush=True)
 
+t_start = time.perf_counter()
 Sq = ueg_ccd_t.structfac_t3(my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
 nvir, nocc = t2.shape[:2]
 Lq = np.zeros([nvir, nocc, 3])
@@ -86,6 +86,8 @@ sq = np.bincount(idx, weights=Sq[:,0])
 q, avgSq = SphereAvg(q, sq)
 print("===CCD(T) Sq===")
 print((np.array([q, avgSq / nelec]).T)[:20])
+t_end = time.perf_counter()
+print(f"(T) strucfac time: {t_end-t_start} sec", flush=True)
 
 # (bT)
 t_start = time.perf_counter()
@@ -99,6 +101,7 @@ print("E(CCD(bT)) =", et / nelec)
 t_end = time.perf_counter()
 print(f"(bT) time: {t_end-t_start} sec", flush=True)
 
+t_start = time.perf_counter()
 Sq = ueg_ccd_t.structfac_t3(my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
 nvir, nocc = t2.shape[:2]
 Lq = np.zeros([nvir, nocc, 3])
@@ -112,6 +115,8 @@ sq = np.bincount(idx, weights=Sq[:,0])
 q, avgSq = SphereAvg(q, sq)
 print("===CCD(bT) Sq===")
 print((np.array([q, avgSq / nelec]).T)[:20])
+t_end = time.perf_counter()
+print(f"(bT) strucfac time: {t_end-t_start} sec", flush=True)
 
 ## bmp2
 #t_start = time.perf_counter()
