@@ -6,14 +6,15 @@ from ccd import *
 from strucfac import *
 from ueg_ccd import qconserv, ueg_ccd, ueg_ccd_t
 
-nelec = 57 * 2
-nbas = 500
+nelec = 7 * 2
+nbas = 300
 rs = 1.0
 
 # hf
 #tw = np.array([0.62, 0.77, 0.12])
 my_ueg = UEG(nelec, nbas, rs, twist=True, verbose=True)
 ehf, ex, moe, idx = hf_energy(my_ueg)
+print("mo_occ:", idx[:my_ueg.nocc])
 print("E(HF) =", ehf, ex)
 print("HOMO-LUMO gap =", moe[my_ueg.nocc] - moe[my_ueg.nocc-1])
 
@@ -83,6 +84,7 @@ Lq = Lq.reshape((-1,3))
 Sq = Sq.reshape((-1,1)) / 3
 q, idx = np.unique(Lq.round(decimals=6), axis=0, return_inverse=True)
 sq = np.bincount(idx, weights=Sq[:,0])
+#print(checkene(my_ueg, sq, q))
 q, avgSq = SphereAvg(q, sq)
 print("===CCD(T) Sq===")
 print((np.array([q, avgSq / nelec]).T)[:20])

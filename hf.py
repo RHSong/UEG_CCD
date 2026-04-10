@@ -5,8 +5,18 @@ def hf_energy(ueg):
     ex = 0
     qvec = np.zeros(3)
     mo_occ = np.zeros(ueg.nbas, dtype=int)
-    mo_occ[:ueg.nocc] = 1
+
+    fock = np.zeros(ueg.nbas)
+    for p in range(ueg.nbas):
+        qvec[:] = ueg.rgvecs[p]
+        qvec += ueg.shift
+        qvec *= ueg.qmin()
+        fock[p] += 0.5 * np.dot(qvec, qvec)
+    idx = np.argsort(fock)
+    moe_idx = idx[:ueg.nocc]
+    mo_occ[moe_idx] = 1
     mo_occ_old = np.zeros(ueg.nbas, dtype=int)
+
     while np.prod(mo_occ == mo_occ_old) < 1:
         fock = np.zeros(ueg.nbas)
         for p in range(ueg.nbas):
@@ -22,6 +32,7 @@ def hf_energy(ueg):
         mo_occ_old = np.zeros(ueg.nbas, dtype=int)
         mo_occ_old[moe_idx] = 1
         mo_occ, mo_occ_old = mo_occ_old, mo_occ
+
     for i in moe_idx:
         qvec[:] = ueg.rgvecs[i]
         qvec += ueg.shift
