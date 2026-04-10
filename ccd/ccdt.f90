@@ -56,6 +56,7 @@
     Real (kind=pr),     Intent(in)  :: t2(nocc+1:nao,nocc,nocc)
     Real (kind=pr),     Intent(out) :: ene
     Integer                         :: a, b, c, i, j, k
+    Integer                         :: omp_get_thread_num
     Real (kind=pr)                  :: denom
     Real (kind=pr)                  :: W1, W2, W3, W4, W5, W6
     Real (kind=pr)                  :: Wsq_sum, Seven, Sodd
@@ -67,8 +68,12 @@
     !$omp private(b, c, i, j, k, denom, &
     !$omp         W1, W2, W3, W4, W5, W6, &
     !$omp         Seven, Sodd, Wsq_sum, Etot)
-    !$omp do schedule(dynamic) reduction(+:ene)
-    Do a = nocc+1, nao
+    !$omp do schedule(dynamic, 4) reduction(+:ene)
+    Do a = nao, nocc+1, -1
+    If (omp_get_thread_num() == 0) then
+        Write(6, '(8x, A, I5, A, I5)') 'T_ene progress: a = ', a, ' / ', nao
+        Flush(6)
+    End If
     Do b = nocc+1, a
         Do i = 1, nocc
         Do j = 1, i 
@@ -215,6 +220,7 @@
     Integer                         :: a, b, c, i, j, k
     Integer                         :: m, f, p, I_idx, J_idx, K_idx
     Integer                         :: p_i(6), p_j(6), p_k(6)
+    Integer                         :: omp_get_thread_num
     Real (kind=pr)                  :: denom, perm_weight
     Real (kind=pr)                  :: W1, W2, W3, W4, W5, W6, W_cur, DW_total
     Real (kind=pr)                  :: Waib(6)
@@ -222,120 +228,124 @@
     Sq = Zero
 
     !$omp parallel default(shared)
-    !$omp do schedule(dynamic) reduction(+:Sq) &
+    !$omp do schedule(dynamic, 4) reduction(+:Sq) &
     !$omp& private(b, c, i, j, k, m, f, denom, perm_weight, &
     !$omp& W1, W2, W3, W4, W5, W6, Waib, p_i, p_j, p_k, p, I_idx, J_idx, K_idx, W_cur, DW_total)
-    Do a = nocc+1, nao
-        Do b = nocc+1, a
+    Do a = nao, nocc+1, -1
+    If (omp_get_thread_num() == 0) then
+        Write(6, '(8x, A, I5, A, I5)') 'T_StructFac progress: a = ', a, ' / ', nao
+        Flush(6)
+    End If
+    Do b = nocc+1, a
+        
+        ! RESTRICTED LOOPS: 6x fewer iterations
+        Do i = 1, nocc
+        Do j = 1, i
+        Do k = 1, j
             
-            ! RESTRICTED LOOPS: 6x fewer iterations
-            Do i = 1, nocc
-            Do j = 1, i
-            Do k = 1, j
+            Call qconserv_c(i, j, k, a, b, c)
+            If (c <= nocc) cycle
+            If (c > b) cycle
+            
+            denom = moe(i) + moe(j) + moe(k) - moe(a) - moe(b) - moe(c)
+
+            ! a, b, c symmetry handling (from your original Sq code)
+            If (a == c) then
+                ! denom = denom
+            Else If (a == b .or. b == c) then
+                denom = denom / 3.0_pr
+            Else
+                denom = denom / 6.0_pr
+            End If
+
+            ! i, j, k permutation weight (prevents overcounting boundaries)
+            If (i == k) then
+                perm_weight = 1.0_pr / 6.0_pr
+            Else If (i == j .or. j == k) then
+                perm_weight = 0.5_pr
+            Else
+                perm_weight = 1.0_pr
+            End If
+
+            ! Evaluate buildW exactly ONCE for the unique triplet
+            Call buildW(eri, t2, W1, a, b, c, i, j, k, nocc, nao)
+            Call buildW(eri, t2, W2, a, b, c, j, k, i, nocc, nao)
+            Call buildW(eri, t2, W3, a, b, c, k, i, j, nocc, nao)
+            Call buildW(eri, t2, W4, a, b, c, j, i, k, nocc, nao)
+            Call buildW(eri, t2, W5, a, b, c, i, k, j, nocc, nao)
+            Call buildW(eri, t2, W6, a, b, c, k, j, i, nocc, nao)
+            
+            ! Algebraically construct Waibjck for all 6 permutations
+            Waib(1) = (4.0_pr * W1 + W2 + W3 - 2.0_pr * (W4 + W5 + W6)) / denom * perm_weight
+            Waib(2) = (4.0_pr * W2 + W3 + W1 - 2.0_pr * (W6 + W4 + W5)) / denom * perm_weight
+            Waib(3) = (4.0_pr * W3 + W1 + W2 - 2.0_pr * (W5 + W6 + W4)) / denom * perm_weight
+            Waib(4) = (4.0_pr * W4 + W5 + W6 - 2.0_pr * (W1 + W2 + W3)) / denom * perm_weight
+            Waib(5) = (4.0_pr * W5 + W6 + W4 - 2.0_pr * (W3 + W1 + W2)) / denom * perm_weight
+            Waib(6) = (4.0_pr * W6 + W4 + W5 - 2.0_pr * (W2 + W3 + W1)) / denom * perm_weight
+
+            p_i = (/ i, j, k, j, i, k /)
+            p_j = (/ j, k, i, i, k, j /)
+            p_k = (/ k, i, j, k, j, i /)
+
+            ! Execute the memory updates for the 6 permutations mapped correctly
+            Do p = 1, 6
+                I_idx = p_i(p)
+                J_idx = p_j(p)
+                K_idx = p_k(p)
+                W_cur = Waib(p)
+
+                ! --- Updates for Sq(a, I_idx) ---
+                DW_total = 0.0_pr
                 
-                Call qconserv_c(i, j, k, a, b, c)
-                If (c <= nocc) cycle
-                If (c > b) cycle
+                Call qconserv2(I_idx, a, J_idx, m)
+                If (m <= nocc .and. m > 0) DW_total = DW_total - t2(b,m,K_idx)
+                Call qconserv2(a, I_idx, b, f)
+                If (f > nocc) DW_total = DW_total + t2(c,K_idx,J_idx)
                 
-                denom = moe(i) + moe(j) + moe(k) - moe(a) - moe(b) - moe(c)
-
-                ! a, b, c symmetry handling (from your original Sq code)
-                If (a == c) then
-                    ! denom = denom
-                Else If (a == b .or. b == c) then
-                    denom = denom / 3.0_pr
-                Else
-                    denom = denom / 6.0_pr
-                End If
-
-                ! i, j, k permutation weight (prevents overcounting boundaries)
-                If (i == k) then
-                    perm_weight = 1.0_pr / 6.0_pr
-                Else If (i == j .or. j == k) then
-                    perm_weight = 0.5_pr
-                Else
-                    perm_weight = 1.0_pr
-                End If
-
-                ! Evaluate buildW exactly ONCE for the unique triplet
-                Call buildW(eri, t2, W1, a, b, c, i, j, k, nocc, nao)
-                Call buildW(eri, t2, W2, a, b, c, j, k, i, nocc, nao)
-                Call buildW(eri, t2, W3, a, b, c, k, i, j, nocc, nao)
-                Call buildW(eri, t2, W4, a, b, c, j, i, k, nocc, nao)
-                Call buildW(eri, t2, W5, a, b, c, i, k, j, nocc, nao)
-                Call buildW(eri, t2, W6, a, b, c, k, j, i, nocc, nao)
+                Call qconserv2(I_idx, a, K_idx, m)
+                If (m <= nocc .and. m > 0) DW_total = DW_total - t2(c,m,J_idx)
+                Call qconserv2(a, I_idx, c, f)
+                If (f > nocc) DW_total = DW_total + t2(b,J_idx,K_idx)
                 
-                ! Algebraically construct Waibjck for all 6 permutations
-                Waib(1) = (4.0_pr * W1 + W2 + W3 - 2.0_pr * (W4 + W5 + W6)) / denom * perm_weight
-                Waib(2) = (4.0_pr * W2 + W3 + W1 - 2.0_pr * (W6 + W4 + W5)) / denom * perm_weight
-                Waib(3) = (4.0_pr * W3 + W1 + W2 - 2.0_pr * (W5 + W6 + W4)) / denom * perm_weight
-                Waib(4) = (4.0_pr * W4 + W5 + W6 - 2.0_pr * (W1 + W2 + W3)) / denom * perm_weight
-                Waib(5) = (4.0_pr * W5 + W6 + W4 - 2.0_pr * (W3 + W1 + W2)) / denom * perm_weight
-                Waib(6) = (4.0_pr * W6 + W4 + W5 - 2.0_pr * (W2 + W3 + W1)) / denom * perm_weight
+                Sq(a,I_idx) = Sq(a,I_idx) + DW_total * W_cur
 
-                p_i = (/ i, j, k, j, i, k /)
-                p_j = (/ j, k, i, i, k, j /)
-                p_k = (/ k, i, j, k, j, i /)
-
-                ! Execute the memory updates for the 6 permutations mapped correctly
-                Do p = 1, 6
-                    I_idx = p_i(p)
-                    J_idx = p_j(p)
-                    K_idx = p_k(p)
-                    W_cur = Waib(p)
-
-                    ! --- Updates for Sq(a, I_idx) ---
-                    DW_total = 0.0_pr
-                    
-                    Call qconserv2(I_idx, a, J_idx, m)
-                    If (m <= nocc .and. m > 0) DW_total = DW_total - t2(b,m,K_idx)
-                    Call qconserv2(a, I_idx, b, f)
-                    If (f > nocc) DW_total = DW_total + t2(c,K_idx,J_idx)
-                    
-                    Call qconserv2(I_idx, a, K_idx, m)
-                    If (m <= nocc .and. m > 0) DW_total = DW_total - t2(c,m,J_idx)
-                    Call qconserv2(a, I_idx, c, f)
-                    If (f > nocc) DW_total = DW_total + t2(b,J_idx,K_idx)
-                    
-                    Sq(a,I_idx) = Sq(a,I_idx) + DW_total * W_cur
-
-                    ! --- Updates for Sq(b, J_idx) ---
-                    DW_total = 0.0_pr
-                    
-                    Call qconserv2(J_idx, b, K_idx, m)
-                    If (m <= nocc .and. m > 0) DW_total = DW_total - t2(c,m,I_idx)
-                    Call qconserv2(b, J_idx, c, f)
-                    If (f > nocc) DW_total = DW_total + t2(a,I_idx,K_idx)
-                    
-                    Call qconserv2(J_idx, b, I_idx, m)
-                    If (m <= nocc .and. m > 0) DW_total = DW_total - t2(a,m,K_idx)
-                    Call qconserv2(b, J_idx, a, f)
-                    If (f > nocc) DW_total = DW_total + t2(c,K_idx,I_idx)
-                    
-                    Sq(b,J_idx) = Sq(b,J_idx) + DW_total * W_cur
-
-                    ! --- Updates for Sq(c, K_idx) ---
-                    DW_total = 0.0_pr
-                    
-                    Call qconserv2(K_idx, c, I_idx, m)
-                    If (m <= nocc .and. m > 0) DW_total = DW_total - t2(a,m,J_idx)
-                    Call qconserv2(c, K_idx, a, f)
-                    If (f > nocc) DW_total = DW_total + t2(b,J_idx,I_idx)
-                    
-                    Call qconserv2(K_idx, c, J_idx, m)
-                    If (m <= nocc .and. m > 0) DW_total = DW_total - t2(b,m,I_idx)
-                    Call qconserv2(c, K_idx, b, f)
-                    If (f > nocc) DW_total = DW_total + t2(a,I_idx,J_idx)
-                    
-                    Sq(c,K_idx) = Sq(c,K_idx) + DW_total * W_cur
-
-                End Do
+                ! --- Updates for Sq(b, J_idx) ---
+                DW_total = 0.0_pr
                 
-            End Do
-            End Do
+                Call qconserv2(J_idx, b, K_idx, m)
+                If (m <= nocc .and. m > 0) DW_total = DW_total - t2(c,m,I_idx)
+                Call qconserv2(b, J_idx, c, f)
+                If (f > nocc) DW_total = DW_total + t2(a,I_idx,K_idx)
+                
+                Call qconserv2(J_idx, b, I_idx, m)
+                If (m <= nocc .and. m > 0) DW_total = DW_total - t2(a,m,K_idx)
+                Call qconserv2(b, J_idx, a, f)
+                If (f > nocc) DW_total = DW_total + t2(c,K_idx,I_idx)
+                
+                Sq(b,J_idx) = Sq(b,J_idx) + DW_total * W_cur
+
+                ! --- Updates for Sq(c, K_idx) ---
+                DW_total = 0.0_pr
+                
+                Call qconserv2(K_idx, c, I_idx, m)
+                If (m <= nocc .and. m > 0) DW_total = DW_total - t2(a,m,J_idx)
+                Call qconserv2(c, K_idx, a, f)
+                If (f > nocc) DW_total = DW_total + t2(b,J_idx,I_idx)
+                
+                Call qconserv2(K_idx, c, J_idx, m)
+                If (m <= nocc .and. m > 0) DW_total = DW_total - t2(b,m,I_idx)
+                Call qconserv2(c, K_idx, b, f)
+                If (f > nocc) DW_total = DW_total + t2(a,I_idx,J_idx)
+                
+                Sq(c,K_idx) = Sq(c,K_idx) + DW_total * W_cur
+
             End Do
             
         End Do
+        End Do
+        End Do
+        
+    End Do
     End Do
     !$omp end do
     !$omp end parallel

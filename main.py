@@ -7,7 +7,7 @@ from strucfac import *
 from ueg_ccd import qconserv, ueg_ccd, ueg_ccd_t
 
 nelec = 57 * 2
-nbas = 300
+nbas = 500
 rs = 1.0
 
 # hf
@@ -68,7 +68,7 @@ print((np.array([q, avgSq / nelec]).T)[:20])
 # (T)
 t_start = time.perf_counter()
 et = ueg_ccd_t.t_ene(my_ueg.eri, t2, moe, my_ueg.nocc, my_ueg.nbas)
-print("E(CCD(T)) =", et)
+print("E(CCD(T)) =", et / nelec)
 t_end = time.perf_counter()
 print(f"(T) time: {t_end-t_start} sec", flush=True)
 
