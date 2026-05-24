@@ -56,7 +56,52 @@ class UEG(object):
         if self.verbose:
             self.print_info()
 
+    def _min_outside_kinetic_norm(self, icur):
+        min_norm = np.inf
+        nearest = np.rint(-self.shift).astype(int)
+        nearest = np.clip(nearest, -icur, icur)
+        for axis in range(3):
+            g_trial = nearest.copy()
+            pos = g_trial.copy()
+            neg = g_trial.copy()
+            pos[axis] = icur + 1
+            neg[axis] = -icur - 1
+            pos_norm = np.dot(pos + self.shift, pos + self.shift)
+            neg_norm = np.dot(neg + self.shift, neg + self.shift)
+            min_norm = min(min_norm, pos_norm, neg_norm)
+        return min_norm
+
+    def _create_shifted_gvecs(self):
+        target_nbas = self.nbas
+        icur = int(math.ceil((3. / (4. * np.pi) * target_nbas) ** (1. / 3.)))
+        converged = False
+        while not converged:
+            if self.verbose:
+                print("...finding shifted gvecs in cube ix = [ %4d ]" % icur)
+            gvecs = []
+            for ix in range(-icur, icur+1):
+                for iy in range(-icur, icur+1):
+                    for iz in range(-icur, icur+1):
+                        gvec = np.array([ix, iy, iz], dtype=int)
+                        shifted = gvec + self.shift
+                        gvecs.append((np.dot(shifted, shifted), ix*ix + iy*iy + iz*iz, ix, iy, iz))
+            gvecs.sort()
+            cutoff = gvecs[target_nbas - 1][0]
+            converged = cutoff < self._min_outside_kinetic_norm(icur)
+            if not converged:
+                icur += 1
+
+        self.ulim = target_nbas
+        self.llim = 0
+        self.gnorm = np.array([entry[0] for entry in gvecs[:target_nbas]])
+        self.rgvecs = np.array([entry[2:] for entry in gvecs[:target_nbas]], dtype=float)
+        self.nbas = target_nbas
+
     def create_gvecs(self):
+        if not np.allclose(self.shift, 0.0):
+            self._create_shifted_gvecs()
+            return
+
         converged=False
         icur = int( math.ceil( ( 3. / ( 4. * np.pi ) * self.nbas ) ** ( 1. / 3. ) ) )
         Gvecs = []
@@ -119,6 +164,7 @@ class UEG(object):
         zrgvecs = self.rgvecs
         zrgvecs = sorted( zrgvecs, key=sorter_function )
         self.rgvecs = np.array( zrgvecs )
+        self.gnorm = np.array(self.gnorm[:outbas])
 
     def print_k(self):
         twopidl = 2.0 * np.pi / self._length
